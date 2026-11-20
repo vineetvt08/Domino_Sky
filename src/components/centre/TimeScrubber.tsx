@@ -162,7 +162,7 @@ export const TimeScrubber: React.FC<TimeScrubberProps> = ({
           ))}
         </div>
 
-        {/* Range Slider */}
+        {/* Range Slider with Full Keyboard Accessibility */}
         <input
           type="range"
           min="0"
@@ -170,8 +170,27 @@ export const TimeScrubber: React.FC<TimeScrubberProps> = ({
           step="1"
           value={currentTimeMin}
           onChange={(e) => onTimeChange(Number(e.target.value))}
-          className="relative w-full h-2 bg-transparent appearance-none cursor-pointer accent-status-closure z-10"
+          onKeyDown={(e) => {
+            if (e.key === 'Home') {
+              e.preventDefault();
+              onTimeChange(0);
+            } else if (e.key === 'End') {
+              e.preventDefault();
+              onTimeChange(TOTAL_MINUTES);
+            } else if (e.key === 'PageUp') {
+              e.preventDefault();
+              onTimeChange(Math.min(TOTAL_MINUTES, currentTimeMin + 60));
+            } else if (e.key === 'PageDown') {
+              e.preventDefault();
+              onTimeChange(Math.max(0, currentTimeMin - 60));
+            }
+          }}
+          className="relative w-full h-2 bg-transparent appearance-none cursor-pointer accent-status-closure z-10 focus:outline-none focus:ring-2 focus:ring-status-closure focus:ring-offset-1 rounded"
           aria-label="Simulation time scrubber"
+          aria-valuenow={currentTimeMin}
+          aria-valuemin={0}
+          aria-valuemax={TOTAL_MINUTES}
+          aria-valuetext={`${formatHHMM(currentTimeMin)} IST`}
         />
 
         {/* Time tick labels */}

@@ -7,6 +7,17 @@ export interface EvaluatedConnections {
   missedPassengersTotal: number;
 }
 
+/**
+ * Evaluates passenger connecting itineraries across the network.
+ *
+ * A connection is deemed missed if:
+ * 1. Either the feeder (from_flight) or connecting (to_flight) flight is cancelled.
+ * 2. `to_flight.actual_dep_min - from_flight.actual_arr_min < min_connect_minutes`.
+ *
+ * @param rawConnections Array of connection definitions from flight_network.json
+ * @param flights Simulated flight results
+ * @returns EvaluatedConnections with per-connection breakdown, missed count, and stranded passengers
+ */
 export function evaluateConnections(
   rawConnections: Connection[],
   flights: Record<string, FlightResult>

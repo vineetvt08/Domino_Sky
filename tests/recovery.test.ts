@@ -40,8 +40,8 @@ describe('Recovery Actions and Enumerator', () => {
 
     // Verify ranking order
     for (let i = 0; i < top3.length - 1; i++) {
-      const a = top3[i];
-      const b = top3[i + 1];
+      const a = top3[i]!;
+      const b = top3[i + 1]!;
 
       if (a.after_kpis.stranded_pax_total === b.after_kpis.stranded_pax_total) {
         if (a.after_kpis.total_delay_minutes === b.after_kpis.total_delay_minutes) {
@@ -55,7 +55,7 @@ describe('Recovery Actions and Enumerator', () => {
     }
 
     // Top action must have before/after KPIs and affected flight IDs
-    const best = top3[0];
+    const best = top3[0]!;
     expect(best.before_kpis).toBeDefined();
     expect(best.after_kpis).toBeDefined();
     expect(best.affected_flight_ids.length).toBeGreaterThan(0);

@@ -45,9 +45,10 @@ export const ChatFollowUp: React.FC<ChatFollowUpProps> = ({
         userText
       );
 
+      const firstOption = response.options[0];
       const replyText =
         response.summary +
-        (response.options.length > 0 ? `\n\nRecommendation: ${response.options[0].rationale}` : '');
+        (firstOption ? `\n\nRecommendation: ${firstOption.rationale}` : '');
 
       setMessages((prev) => [
         ...prev,

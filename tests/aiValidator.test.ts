@@ -21,7 +21,7 @@ describe('AI Number & Option Validator', () => {
 
   it('(a) validates matching response with legitimate engine numbers', () => {
     const kpis = baseResult.kpis;
-    const best = top3[0];
+    const best = top3[0]!;
 
     const validResponse: DispatcherAiResponse = {
       summary: `There are ${kpis.delayed_flights} delayed flights with ${kpis.stranded_pax_total} stranded passengers.`,
@@ -41,7 +41,7 @@ describe('AI Number & Option Validator', () => {
   });
 
   it('(b) rejects an invented number (hallucination)', () => {
-    const best = top3[0];
+    const best = top3[0]!;
     const invalidResponse: DispatcherAiResponse = {
       summary: `There are 999999 delayed flights across India.`, // 999999 is definitely not in the data
       options: [
@@ -60,7 +60,7 @@ describe('AI Number & Option Validator', () => {
   });
 
   it('(c) accepts numbers formatted differently (e.g. 1,240 vs 1240)', () => {
-    const best = top3[0];
+    const best = top3[0]!;
     // Pick an existing number, format with comma
     const existingNum = best.before_kpis.total_delay_minutes;
     const formattedWithComma = existingNum.toLocaleString();

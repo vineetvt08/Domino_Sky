@@ -9,6 +9,18 @@ export interface CrewEvaluation {
   crewsTimedOutCount: number;
 }
 
+/**
+ * Evaluates flight crew duty limitations under legal civil aviation mandates (max 600 minutes).
+ *
+ * Rules:
+ * - Duty duration = `last_flight.actual_arr_min - duty_start`.
+ * - If duty > 600 min, crew times out; subsequent flights are flagged for cancellation (cause: crew_limit).
+ * - Crews within 30 min of the 600m threshold are classified as "at risk".
+ *
+ * @param crews Array of crew assignments from flight_network.json
+ * @param flights Simulated flight results
+ * @returns CrewEvaluation with per-crew duty used, at-risk counts, and timed-out flight IDs
+ */
 export function evaluateCrewDuty(
   crews: Crew[],
   flights: Record<string, FlightResult>

@@ -18,6 +18,15 @@ export interface SinglePassOptions {
   settings?: Partial<EngineSettings>;
 }
 
+/**
+ * Determines whether a given airport is closed at minute `min`, iteratively resolving
+ * stacked or contiguous closures up to 10 iterations.
+ *
+ * @param airportId 3-letter IATA code of the airport
+ * @param min Scheduled or earliest departure/arrival minute (0..1440)
+ * @param closures Active airport closures
+ * @returns Object with `resolvedMin` (reopening time or original minute), `held: boolean`, and `heldBy` airport
+ */
 export function resolveClosure(
   airportId: string,
   min: number,
@@ -46,7 +55,19 @@ export function resolveClosure(
 }
 
 /**
- * Executes one deterministic forward pass over sorted flights
+ * Executes a deterministic single forward pass across flights sorted by scheduled departure.
+ *
+ * Rules:
+ * 1. earliest_dep = max(scheduled_dep, prev_flight_on_same_tail.actual_arr + min_turnaround).
+ * 2. Origin closure ground hold: if origin closed at earliest_dep, dep = closure_end.
+ * 3. actual_arr = dep + block_minutes. If destination closed, actual_arr = closure_end.
+ * 4. delay = dep - scheduled_dep. Stores dominant cause (closure_hold | aircraft_knock_on | crew_limit | none).
+ * 5. Optional capacity release backlog pacing after reopening.
+ *
+ * @param data Complete NetworkData flight graph
+ * @param closures Active airport closures
+ * @param options Pass options including cancelled flight IDs, spare overrides, and capacity settings
+ * @returns Map of flightId to detailed FlightResult
  */
 export function runSinglePass(
   data: NetworkData,
@@ -206,7 +227,20 @@ export function runSinglePass(
 }
 
 /**
- * Runs full simulation including iterative crew duty checks (up to 5 rounds)
+ * Runs the complete deterministic disruption cascade simulation.
+ *
+ * Coordinates iterative forward passes and crew duty limit enforcement:
+ * - Runs forward simulation pass.
+ * - Checks crew duty against legal maximum (600 mins).
+ * - Cancels flights exceeding crew duty limits (cause: crew_limit).
+ * - Re-runs pass until crew schedule converges (max 5 iterations).
+ * - Evaluates passenger connections (breaks if connect time < 45 min).
+ * - Computes complete network KPIs and airport impact summaries.
+ *
+ * @param data NetworkData flight network graph
+ * @param closures Active airport closures (up to 3)
+ * @param options Simulation options (forced cancellations, spare aircraft swaps, engine settings)
+ * @returns ResultJSON containing flight results, airport impacts, crew statuses, connections, and KPIs
  */
 export function runSimulation(
   data: NetworkData,

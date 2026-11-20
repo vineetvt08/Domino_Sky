@@ -33,6 +33,9 @@ import { playRecoveryChime } from './utils/audio';
 import { encodeStateToHash, decodeHashToState } from './utils/urlState';
 import { formatHHMM } from './utils/time';
 import { DispatchResultPayload } from '../server/gemini';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { SkipToContent } from './components/common/SkipToContent';
+import { LiveAnnouncer } from './components/common/LiveAnnouncer';
 
 const networkData = rawData as NetworkData;
 
@@ -254,9 +257,10 @@ export const App: React.FC = () => {
     setTimeout(() => {
       const { top3 } = enumerateRecoveryActions(networkData, [bomClosure], runSimulation(networkData, [bomClosure]));
       setEvaluatedActions(top3);
-      if (top3.length > 0) {
+      const bestAction = top3[0]?.action;
+      if (bestAction) {
         setTimeout(() => {
-          handleApplyAction(top3[0].action);
+          handleApplyAction(bestAction);
         }, 1200);
       }
     }, 2500);
@@ -273,62 +277,43 @@ export const App: React.FC = () => {
     navigator.clipboard?.writeText(window.location.href);
   };
 
-  // Keyboard navigation & shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-
-      if (e.code === 'Space') {
-        e.preventDefault();
-        setIsPlaying((p) => !p);
-      } else if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        setCurrentTimeMin((prev) => Math.max(0, prev - 15));
-      } else if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        setCurrentTimeMin((prev) => Math.min(1440, prev + 15));
-      } else if (e.code === 'Escape') {
-        setSelectedFlightId(undefined);
-        setIsSettingsOpen(false);
-        setIsHelpOpen(false);
-        setIsTableViewOpen(false);
-        setIsWeakestOpen(false);
-        setIsComparisonOpen(false);
-        setIsPrintOpen(false);
-      } else if (e.key === 'r' || e.key === 'R') {
-        if (closures.length > 0 && !isEvaluatingAi) {
-          handleRecommendRecovery();
-        }
-      } else if (e.key === '1') {
-        setViewMode('baseline');
-      } else if (e.key === '2') {
-        setViewMode('disrupted');
-      } else if (e.key === '3' && appliedAction) {
-        setViewMode('recovered');
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          // Redo
-          if (historyIndex < history.length - 1) {
-            setHistoryIndex(historyIndex + 1);
-            setClosures(history[historyIndex + 1]);
-          }
-        } else {
-          // Undo
-          if (historyIndex > 0) {
-            setHistoryIndex(historyIndex - 1);
-            setClosures(history[historyIndex - 1]);
-          } else if (historyIndex === 0) {
-            setHistoryIndex(-1);
-            setClosures([]);
-          }
-        }
+  // Keyboard navigation & shortcuts hook
+  useKeyboardShortcuts({
+    closures,
+    isAiLoading: isEvaluatingAi,
+    appliedAction: appliedAction || null,
+    history,
+    historyIndex,
+    onTogglePlay: () => setIsPlaying((p) => !p),
+    onStepTime: (delta) =>
+      setCurrentTimeMin((prev) => Math.max(0, Math.min(1440, prev + delta))),
+    onDismissModals: () => {
+      setSelectedFlightId(undefined);
+      setIsSettingsOpen(false);
+      setIsHelpOpen(false);
+      setIsTableViewOpen(false);
+      setIsWeakestOpen(false);
+      setIsComparisonOpen(false);
+      setIsPrintOpen(false);
+    },
+    onRecommendRecovery: handleRecommendRecovery,
+    onSetViewMode: setViewMode,
+    onUndo: () => {
+      if (historyIndex > 0) {
+        setHistoryIndex(historyIndex - 1);
+        setClosures(history[historyIndex - 1] ?? []);
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1);
+        setClosures([]);
       }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [closures, isEvaluatingAi, appliedAction, history, historyIndex]);
+    },
+    onRedo: () => {
+      if (historyIndex < history.length - 1) {
+        setHistoryIndex(historyIndex + 1);
+        setClosures(history[historyIndex + 1] ?? []);
+      }
+    },
+  });
 
   // Selected Flight Object
   const selectedFlightObj = selectedFlightId ? currentResult.flights[selectedFlightId] || null : null;
@@ -353,6 +338,15 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background text-ink font-sans select-none">
+      {/* Accessible Skip Link & Screen Reader Live Region */}
+      <SkipToContent />
+      <LiveAnnouncer
+        kpis={currentResult.kpis}
+        closuresCount={closures.length}
+        lastClosureAirport={closures[closures.length - 1]?.airport}
+        isAiLoading={isEvaluatingAi}
+      />
+
       {/* Top Bar (56px) */}
       <TopBar
         scenarioName={scenarioName}
@@ -391,7 +385,11 @@ export const App: React.FC = () => {
         />
 
         {/* Center Panel: KPIs, Map, Delay Ribbon, Gantt, Time Scrubber */}
-        <main className="flex-1 flex flex-col p-3 overflow-y-auto space-y-3 min-w-0 bg-background relative">
+        <main
+          id="main-content"
+          role="main"
+          className="flex-1 flex flex-col p-3 overflow-y-auto space-y-3 min-w-0 bg-background relative focus:outline-none"
+        >
           {/* First run empty state banner */}
           {showEmptyOverlay && closures.length === 0 && (
             <EmptyStateOverlay

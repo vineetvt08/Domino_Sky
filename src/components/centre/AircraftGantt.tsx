@@ -43,6 +43,7 @@ export const AircraftGantt: React.FC<AircraftGanttProps> = ({
       const timer = setTimeout(() => setIsCascadeTriggered(false), 1200);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [closures, reducedMotion]);
 
   // Group flights by tail

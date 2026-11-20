@@ -268,7 +268,7 @@ export const ClosureCard: React.FC<ClosureCardProps> = ({
               </div>
             </div>
 
-            {/* Dual Handle Slider 00:00 - 24:00 */}
+            {/* Dual Handle Slider 00:00 - 24:00 with Full Keyboard Accessibility */}
             <div className="space-y-1 pt-1">
               <div className="flex items-center gap-2">
                 <input
@@ -278,9 +278,28 @@ export const ClosureCard: React.FC<ClosureCardProps> = ({
                   step="5"
                   value={startMin}
                   onChange={(e) => handleSliderChange(Number(e.target.value), endMin)}
-                  className="w-full accent-status-closure h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Home') {
+                      e.preventDefault();
+                      handleSliderChange(0, endMin);
+                    } else if (e.key === 'End') {
+                      e.preventDefault();
+                      handleSliderChange(Math.max(0, endMin - 15), endMin);
+                    } else if (e.key === 'PageUp') {
+                      e.preventDefault();
+                      handleSliderChange(Math.min(endMin - 15, startMin + 60), endMin);
+                    } else if (e.key === 'PageDown') {
+                      e.preventDefault();
+                      handleSliderChange(Math.max(0, startMin - 60), endMin);
+                    }
+                  }}
+                  className="w-full accent-status-closure h-2 bg-slate-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-status-closure"
                   title={`Start: ${formatHHMM(startMin)}`}
-                  aria-label="Closure start time"
+                  aria-label="Closure window start time"
+                  aria-valuenow={startMin}
+                  aria-valuemin={0}
+                  aria-valuemax={endMin - 15}
+                  aria-valuetext={`${formatHHMM(startMin)} IST`}
                 />
                 <input
                   type="range"
@@ -289,9 +308,28 @@ export const ClosureCard: React.FC<ClosureCardProps> = ({
                   step="5"
                   value={endMin}
                   onChange={(e) => handleSliderChange(startMin, Number(e.target.value))}
-                  className="w-full accent-status-closure h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Home') {
+                      e.preventDefault();
+                      handleSliderChange(startMin, Math.min(1440, startMin + 15));
+                    } else if (e.key === 'End') {
+                      e.preventDefault();
+                      handleSliderChange(startMin, 1440);
+                    } else if (e.key === 'PageUp') {
+                      e.preventDefault();
+                      handleSliderChange(startMin, Math.min(1440, endMin + 60));
+                    } else if (e.key === 'PageDown') {
+                      e.preventDefault();
+                      handleSliderChange(startMin, Math.max(startMin + 15, endMin - 60));
+                    }
+                  }}
+                  className="w-full accent-status-closure h-2 bg-slate-200 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-status-closure"
                   title={`End: ${formatHHMM(endMin)}`}
-                  aria-label="Closure end time"
+                  aria-label="Closure window end time"
+                  aria-valuenow={endMin}
+                  aria-valuemin={startMin + 15}
+                  aria-valuemax={1440}
+                  aria-valuetext={`${formatHHMM(endMin)} IST`}
                 />
               </div>
               <div className="flex justify-between text-[10px] font-mono text-ink-muted">

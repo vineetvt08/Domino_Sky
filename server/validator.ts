@@ -43,9 +43,13 @@ export function collectAllowedNumbers(
       if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
         // HH:MM time
         allowed.add(trimmed);
-        const [h, m] = trimmed.split(':').map(Number);
-        allowed.add(h.toString());
-        allowed.add(m.toString());
+        const parts = trimmed.split(':').map(Number);
+        const h = parts[0];
+        const m = parts[1];
+        if (h !== undefined && m !== undefined) {
+          allowed.add(h.toString());
+          allowed.add(m.toString());
+        }
       } else if (!isNaN(Number(trimmed))) {
         allowed.add(trimmed);
       }

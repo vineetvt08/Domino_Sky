@@ -15,6 +15,19 @@ export interface WeakestAirportResult {
   simulation: ResultJSON;
 }
 
+/**
+ * Runs a 1-hour sensitivity stress-test across all 16 airports in the network.
+ *
+ * For each airport, simulates a 60-minute shutdown during peak traffic hours (10:00-11:00 IST),
+ * measures system-wide disruption cascade, and ranks airports from most vulnerable to least:
+ * 1. Stranded passengers descending (higher impact ranks first)
+ * 2. Total network delay minutes descending
+ *
+ * @param data Complete NetworkData flight graph
+ * @param windowStartMin Test window start minute (default: 600 / 10:00 IST)
+ * @param durationMin Test closure duration in minutes (default: 60 min)
+ * @returns Array of WeakestAirportResult sorted by descending network vulnerability
+ */
 export function simulateWeakestAirports(
   data: NetworkData,
   windowStartMin: number = 600, // 10:00 IST

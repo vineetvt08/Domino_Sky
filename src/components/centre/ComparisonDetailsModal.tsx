@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, GitCompare, ArrowRight } from 'lucide-react';
-import { ResultJSON, RecoveryAction } from '../../types/engine';
+import { ResultJSON, RecoveryAction, FlightResult } from '../../types/engine';
 
 interface ComparisonDetailsModalProps {
   isOpen: boolean;
@@ -28,21 +28,18 @@ export const ComparisonDetailsModal: React.FC<ComparisonDetailsModalProps> = ({
 
   // Find all flights that changed between disrupted and recovered
   const changedFlights = Object.keys(disruptedResult.flights)
-    .filter((fId) => {
+    .map((fId) => {
       const b = disruptedResult.flights[fId];
       const a = recoveredResult.flights[fId];
-      return (
+      if (!b || !a) return null;
+      const isChanged =
         b.actual_dep !== a.actual_dep ||
         b.actual_arr !== a.actual_arr ||
         b.is_cancelled !== a.is_cancelled ||
-        b.tail_id !== a.tail_id
-      );
+        b.tail_id !== a.tail_id;
+      return isChanged ? { flightId: fId, before: b, after: a } : null;
     })
-    .map((fId) => ({
-      flightId: fId,
-      before: disruptedResult.flights[fId],
-      after: recoveredResult.flights[fId],
-    }));
+    .filter((item): item is { flightId: string; before: FlightResult; after: FlightResult } => item !== null);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">

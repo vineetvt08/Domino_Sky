@@ -13,7 +13,7 @@ describe('Network Data Validator', () => {
 
   it('detects missing tail_id on a flight', () => {
     const data = JSON.parse(JSON.stringify(rawData)) as NetworkData;
-    data.flights[0].tail_id = '';
+    data.flights[0]!.tail_id = '';
     const result = validateNetworkData(data);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('missing tail_id'))).toBe(true);
@@ -23,7 +23,7 @@ describe('Network Data Validator', () => {
     const data = JSON.parse(JSON.stringify(rawData)) as NetworkData;
     // Break leg order for VT-DS01
     const ds01Flights = data.flights.filter((f) => f.tail_id === 'VT-DS01');
-    ds01Flights[1].leg_order = 5; // instead of 2
+    ds01Flights[1]!.leg_order = 5; // instead of 2
     const result = validateNetworkData(data);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('leg_order is not contiguous'))).toBe(true);
@@ -41,7 +41,7 @@ describe('Network Data Validator', () => {
 
   it('detects non-existent connection flight', () => {
     const data = JSON.parse(JSON.stringify(rawData)) as NetworkData;
-    data.connections[0].to_flight = 'DS9999';
+    data.connections[0]!.to_flight = 'DS9999';
     const result = validateNetworkData(data);
     expect(result.valid).toBe(false);
     expect(result.errors.some((e) => e.includes('does not exist'))).toBe(true);

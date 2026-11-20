@@ -8,57 +8,72 @@ Domino Sky visualizes **which** flights are late, **why** they are late, **how m
 
 ---
 
-## 1. Key Highlights & Hard Rules
+## 1. System Architecture & Data Flow
+
+```text
+               ┌────────────────────────────────────────────────────────┐
+               │                  User Control Room                     │
+               │   • Closure Slider / Map Click (Up to 3 Closures)      │
+               │   • Time Scrubber (00:00 - 24:00, 1x/4x/16x Playback)  │
+               └───────────────────────────┬────────────────────────────┘
+                                           │
+                                           ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        Pure TypeScript Deterministic Engine                           │
+│                                (src/engine/)                                          │
+│                                                                                        │
+│  1. Single Forward Pass (Sorted by Sched Dep)                                         │
+│     earliest_dep = max(sched_dep, prev_arr + 30m turnaround)                          │
+│     Ground Hold: if origin closed at earliest_dep => dep = closure_end                │
+│     In-Air Hold: if dest closed at actual_arr   => arr = closure_end                  │
+│                                                                                        │
+│  2. Legal Crew Duty Convergence Loop (max 5 rounds)                                    │
+│     duty = last_flight.actual_arr - duty_start                                        │
+│     if duty > 600m => cancel overflow flights, re-run forward pass                    │
+│                                                                                        │
+│  3. Connection Evaluator (< 45 min min connect => broken connection)                  │
+│                                                                                        │
+│  4. Deterministic Recovery Enumerator (~100 candidate actions evaluated in < 70ms)    │
+│     Rank top 3: (stranded_pax ASC, delay_minutes ASC, cancellations ASC)              │
+└───────────────────────────┬──────────────────────────────────┬────────────────────────┘
+                            │                                  │
+          Precomputed       │                                  │ Evaluated Top 3 Actions
+          Simulation Result │                                  │ Before/After KPIs
+                            ▼                                  ▼
+               ┌────────────────────────────────────────────────────────┐
+               │              Backend Dispatcher Service                │
+               │                   (/api/dispatch)                      │
+               │                                                        │
+               │  • Per-IP Sliding Rate Limiter (10 req/min)            │
+               │  • 256KB Payload Ceiling & Content-Type Enforcement    │
+               │  • Strict Schema Validation (Disallow Unknown Fields)  │
+               │  • Strict CSP, HSTS, Anti-Sniff & Anti-Framing Headers │
+               │  • Google Gemini SDK (@google/genai, temp: 0.2)        │
+               │  • Strict Number & ID Cross-Validator vs ResultJSON   │
+               │  • Deterministic Verified Fallback Template            │
+               └───────────────────────────┬────────────────────────────┘
+                                           │
+                                           ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                               Reactive React 19 UI                                     │
+│  • Skip-to-Content & ARIA Live polite announcements for screen readers                 │
+│  • Projected SVG India map with active flight arcs and weather clouds                  │
+│  • 16-tail Gantt chart with 40ms domino tipping animation & causal linking             │
+│  • Side drawer with vertical causal chain & accessible focus trap                      │
+│  • Full Table View modal, 1-Hour Hub Sensitivity Matrix, and Printable Incident Report │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Key Highlights & Hard Rules
 
 - **100% Deterministic Engine**: All delay minutes, cancellation decisions, crew duty limits, and passenger numbers come from pure TypeScript algorithms (`src/engine/`).
 - **AI Explains & Recommends (Never Computes)**: The Google Gemini integration (`@google/genai`) only interprets precomputed engine results.
 - **Strict Number & Option Validator**: Every number cited by Gemini in the summary, rationale, and caveats is cross-checked against the simulation `ResultJSON`. Any hallucinated or mismatched number triggers a retry or falls back to a verified deterministic template.
-- **Self-Contained & Light Theme**: Built with a calm control-room aesthetic (`#F7F8FA` background, `#FFFFFF` cards, Inter and JetBrains Mono tabular typography), zero remote tile maps, and SVG rendering.
-- **Responsive & Accessible**: Keyboard shortcuts (`Space`, `←/→`, `Esc`, `R`, `1/2/3`, `Ctrl+Z`), visible focus rings, ARIA labels, and a complete table-view toggle.
-
----
-
-## 2. Architecture & File Structure
-
-```text
-├── data/
-│   └── flight_network.json       # 16 airports, 70 flights, 21 connections, 16 crews, 2 spares
-├── server/                       # Backend route for Google Gemini API
-│   ├── apiHandler.ts             # Connect/Express middleware for /api/dispatch
-│   ├── gemini.ts                 # @google/genai SDK integration (temperature: 0.2, responseSchema)
-│   ├── validator.ts              # Strict number, HH:MM, and option ID validator
-│   └── cache.ts                  # SHA-256 hash cache for scenario results & Q&A
-├── src/
-│   ├── engine/                   # Pure TypeScript simulation engine (zero UI dependencies)
-│   │   ├── validator.ts          # Network data schema, tail contiguity, and integrity validator
-│   │   ├── simulator.ts          # Deterministic single forward pass, ground holds, knock-on cascade
-│   │   ├── connectionTracker.ts  # Missed connection calculation (< 45m min connect)
-│   │   ├── crewDuty.ts           # 600m duty limits & iterative cancellation (max 5 rounds)
-│   │   ├── recoveryEnumerator.ts # Evaluates ~100 candidate actions (spares & cancels), ranks top 3
-│   │   └── weakestAirport.ts     # 1-hour sensitivity stress-test across all 16 airports
-│   ├── components/
-│   │   ├── topbar/               # Scenario name, Baseline/Disrupted/Recovered toggle, Share hash
-│   │   ├── leftpanel/            # Closure Card (dual slider, presets) & Airport Impact Table
-│   │   ├── centre/
-│   │   │   ├── KpiStrip.tsx      # 5 KPI cards with count-up animations & passenger gauge
-│   │   │   ├── NetworkMap.tsx    # Projected SVG India map, active plane arcs, holding loops, weather
-│   │   │   ├── AircraftGantt.tsx # 16 tails + 2 spares, domino tipping animation, causal arrows
-│   │   │   ├── DelayRibbon.tsx   # Delay-budget progress bar by root cause
-│   │   │   ├── TimeScrubber.tsx  # 00:00–24:00 timeline, playback 1x/4x/16x, airborne counters
-│   │   │   ├── WeakestAirportsModal.tsx # Vulnerability ranking matrix
-│   │   │   └── ComparisonDetailsModal.tsx # Before vs. After diff table
-│   │   ├── rightpanel/           # AI Dispatcher panel, Top 3 options, Trust badge, Q&A chat
-│   │   ├── drawer/               # Flight detail drawer with vertical root cause chain
-│   │   └── common/               # Empty state overlay, 4-step help tour, 1-page printable summary
-│   ├── services/                 # aiDispatcher client service with 15s timeout & offline fallback
-│   ├── utils/                    # SVG projection, time conversions, Web Audio chime synthesizer
-│   └── App.tsx                   # Central state orchestration, undo/redo, linked selection
-└── tests/
-    ├── dataValidator.test.ts     # Validates flight_network.json schema integrity
-    ├── engine.test.ts            # Baseline zero-delay test, 3 hand-calculated scenarios, crew timeout
-    ├── recovery.test.ts          # Spare swap validity rules and candidate ranking order
-    └── aiValidator.test.ts       # Exact number verification, formatted number support, ID checks
-```
+- **Enterprise Security**: 256 KB payload limit, 10 req/min rate limiter, strict schema validation, defensive security headers (CSP, nosniff, DENY framing), zero secret leaks in client bundles, and full threat model documented in [`SECURITY.md`](SECURITY.md).
+- **Control-Room Design**: Calm control-room aesthetic (`#F7F8FA` background, `#FFFFFF` cards, Inter and JetBrains Mono tabular typography), zero remote tile maps, and SVG rendering.
+- **Full WCAG Accessibility**: Accessible skip link, dual range slider keyboard controls (`Home`, `End`, `PageUp`, `PageDown`), `aria-live="polite"` simulation updates, `aria-modal` dialogs with focus trapping and focus restoration, and minimum 44px touch envelopes.
 
 ---
 
@@ -107,28 +122,34 @@ GEMINI_MODEL=gemini-2.5-flash
 ```
 *(Note: If no API key is provided, the simulator automatically uses verified deterministic engine templates, keeping 100% of the UI and simulation fully functional.)*
 
-### Running the App
-```bash
-# Start Vite development server (with /api/dispatch middleware)
-npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+### Available Scripts
 
-### Running Unit Tests
-```bash
-npm run test
-```
-Runs the full Vitest test suite (`16/16 passing across 4 test suites`).
-
-### Production Build & Preview
-```bash
-npm run build
-npm run preview
-```
+| Script | Command | Purpose |
+|---|---|---|
+| `npm run dev` | `vite` | Starts Vite dev server with `/api/dispatch` middleware |
+| `npm run test` | `vitest run` | Runs all 47 unit, property, and edge-case tests |
+| `npm run typecheck` | `tsc --noEmit` | Strict TypeScript compiler validation |
+| `npm run check` | `tsc --noEmit && vitest run && vite build` | Unified pipeline check |
+| `npm run build` | `tsc && vite build` | Generates optimized production distribution |
+| `npm run preview` | `vite preview` | Serves production build locally |
 
 ---
 
-## 5. Delight & Motion Details
+## 5. Test Suite (47/47 Passing Tests)
+
+The test suite covers full simulation correctness, invariants, edge cases, and API security:
+- `tests/engine.test.ts`: Zero closure baseline equivalence and 3 hand-calculated validation scenarios.
+- `tests/recovery.test.ts`: Spare swap eligibility rules and deterministic candidate ranking.
+- `tests/dataValidator.test.ts`: Structural integrity of `flight_network.json` (tails, legs, routes, connections).
+- `tests/aiValidator.test.ts`: Number hallucination rejection, formatted number support, and option ID verification.
+- `tests/edgeCases.test.ts`: Closures at 00:00 (start of day), 24:00 (end of day), 0-flight airports, and 600m/601m crew threshold boundaries.
+- `tests/properties.test.ts`: 15 property-based tests verifying physical causality, non-negative delays, and passenger totals.
+- `tests/apiHandler.test.ts`: HTTP status codes (405, 415, 400, 413, 429), strict schema rejections, and security headers.
+- `tests/performance.test.ts`: Full-day simulation in < 2ms, and 100-action recovery enumeration in < 70ms.
+
+---
+
+## 6. Delight & Motion Details
 
 - **The Signature Moment**: When an airport closure is applied, dominoes tip over along each affected aircraft rotation chain in the Gantt with a 40ms stagger from left to right, and delayed bars stretch rightward with an elastic ease.
 - **Flight Arcs & Holding Loops**: Active flights display small paper planes banking along the route with trailing dots. Flights held on the ground loop gently over the closed airport.
@@ -138,13 +159,15 @@ npm run preview
 
 ---
 
-## 6. Keyboard Shortcuts
+## 7. Keyboard Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
 | `Space` | Play / Pause time scrubber simulation |
-| `←` / `→` | Step time backward / forward by 15 minutes |
-| `Esc` | Close Flight Drawer and modals |
+| `←` / `→` | Step time backward / forward by 15 minutes (Shift: 60 minutes) |
+| `Home` / `End` | Jump to 00:00 / 24:00 (on sliders) |
+| `PageUp` / `PageDown` | Jump 60 minutes backward / forward (on sliders) |
+| `Esc` | Close Flight Drawer and modal dialogs |
 | `R` | Trigger AI recovery recommendations |
 | `1` | Switch to **Baseline** view (clear skies schedule) |
 | `2` | Switch to **Disrupted** view (active cascade) |
@@ -154,7 +177,7 @@ npm run preview
 
 ---
 
-## 7. Extras
+## 8. Extras & Control Room Tools
 
 - **"The Mumbai Domino" 60s Demo**: One click in the top bar automatically sets Mumbai (BOM) closed 14:00–15:30, lets the cascade unfold across the map and Gantt, runs the AI dispatcher evaluation, and applies the optimal spare aircraft swap.
 - **Find Weakest Airport**: Simulates a standard 1-hour closure at all 16 airports in India and ranks them by total stranded passengers and delay minutes to identify single-point-of-failure hubs.

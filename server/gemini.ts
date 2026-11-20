@@ -29,6 +29,17 @@ const RESPONSE_SCHEMA = {
   required: ['summary', 'options', 'caveats'],
 };
 
+function sanitizeUserQuery(rawQuery?: string): string | undefined {
+  if (!rawQuery) return undefined;
+  // Cap length to 300 characters max
+  let clean = rawQuery.trim().slice(0, 300);
+  // Strip non-printable ASCII control characters
+  clean = clean.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // Neutralize prompt instruction override delimiters
+  clean = clean.replace(/(?:SYSTEM_INSTRUCTION|BEGIN_SYSTEM|END_SYSTEM)/gi, '');
+  return clean.length > 0 ? clean : undefined;
+}
+
 export interface DispatchResultPayload {
   summary: string;
   options: Array<{
@@ -47,9 +58,11 @@ export async function generateDispatcherRecommendation(
   topActions: EvaluatedAction[],
   userQuery?: string
 ): Promise<DispatchResultPayload> {
+  const sanitizedQuery = sanitizeUserQuery(userQuery);
+
   const cacheKey = dispatchCache.computeKey(
     { kpis: baseResult.kpis, closures: baseResult.closures, options: topActions.map((a) => a.action.id) },
-    userQuery || ''
+    sanitizedQuery || ''
   );
 
   // Check cache
@@ -86,7 +99,7 @@ export async function generateDispatcherRecommendation(
       after_kpis: item.after_kpis,
       affected_flights: item.affected_flight_ids,
     })),
-    user_query: userQuery || undefined,
+    user_query: sanitizedQuery || undefined,
   };
 
   const basePrompt = `Precomputed Simulation Results:\n${JSON.stringify(inputPayload, null, 2)}`;

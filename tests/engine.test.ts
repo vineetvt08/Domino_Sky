@@ -45,7 +45,7 @@ describe('Domino Sky Engine', () => {
     const result = runSimulation(data, closures);
 
     // DS0501 scheduled dep 08:15 BOM -> BLR. Origin closed until 09:30.
-    const ds0501 = result.flights['DS0501'];
+    const ds0501 = result.flights['DS0501']!;
     expect(ds0501).toBeDefined();
     expect(ds0501.actual_dep_min).toBe(570); // 09:30
     expect(ds0501.actual_dep).toBe('09:30');
@@ -54,14 +54,14 @@ describe('Domino Sky Engine', () => {
     expect(ds0501.caused_by).toBe('BOM');
 
     // DS0201 arrives BOM planned 08:10. Held until 09:30 reopening.
-    const ds0201 = result.flights['DS0201'];
+    const ds0201 = result.flights['DS0201']!;
     expect(ds0201).toBeDefined();
     expect(ds0201.actual_arr_min).toBe(570); // 09:30
     expect(ds0201.delay_minutes).toBe(80); // 09:30 - 08:10 = 80 min
 
     // DS0202 is on same tail VT-DS02, scheduled dep 09:20.
     // Turnaround = 09:30 + 30 min = 10:00 (600 min).
-    const ds0202 = result.flights['DS0202'];
+    const ds0202 = result.flights['DS0202']!;
     expect(ds0202).toBeDefined();
     expect(ds0202.actual_dep_min).toBe(600); // 10:00
     expect(ds0202.actual_dep).toBe('10:00');
@@ -85,13 +85,13 @@ describe('Domino Sky Engine', () => {
     const result = runSimulation(data, closures);
 
     // DS1201 planned dep 06:30, held to 07:15. Block = 70 min -> actual arr = 08:25 (505 min).
-    const ds1201 = result.flights['DS1201'];
+    const ds1201 = result.flights['DS1201']!;
     expect(ds1201.actual_dep_min).toBe(435);
     expect(ds1201.actual_arr_min).toBe(505);
 
     // DS1502 dep is 08:50 (530 min).
     // Actual connection window = 530 - 505 = 25 min < 45 min!
-    const cx01 = result.connections['CX01'];
+    const cx01 = result.connections['CX01']!;
     expect(cx01.is_missed).toBe(true);
     expect(cx01.passengers).toBe(43);
     expect(cx01.actual_connection_time).toBe(25);

@@ -5,6 +5,22 @@ export interface ValidationResult {
   errors: string[];
 }
 
+/**
+ * Validates the structural integrity and relational consistency of flight_network.json.
+ * 
+ * Verifies:
+ * - Every airport exists and has valid coordinates.
+ * - Every flight references existing origin/destination airports.
+ * - Every flight's tail exists.
+ * - Flight leg orders per tail are contiguous starting from 1.
+ * - Route continuity: the arrival airport of leg N equals the departure airport of leg N+1.
+ * - Every connection references existing flights and valid connection time windows.
+ * - Every crew references valid tail, base, and flight IDs.
+ * - Spare aircraft are located at valid bases.
+ * 
+ * @param data Parsed NetworkData payload
+ * @returns ValidationResult with `valid: boolean` and descriptive error strings if invalid
+ */
 export function validateNetworkData(data: NetworkData): ValidationResult {
   const errors: string[] = [];
 
@@ -84,17 +100,18 @@ export function validateNetworkData(data: NetworkData): ValidationResult {
   for (const [tailId, flights] of flightsByTail.entries()) {
     flights.sort((a, b) => a.leg_order - b.leg_order);
     for (let i = 0; i < flights.length; i++) {
+      const curr = flights[i];
+      if (!curr) continue;
       const expectedLeg = i + 1;
-      if (flights[i].leg_order !== expectedLeg) {
+      if (curr.leg_order !== expectedLeg) {
         errors.push(
-          `Tail ${tailId} leg_order is not contiguous. Expected ${expectedLeg}, found ${flights[i].leg_order} on flight ${flights[i].flight_id}`
+          `Tail ${tailId} leg_order is not contiguous. Expected ${expectedLeg}, found ${curr.leg_order} on flight ${curr.flight_id}`
         );
       }
-      // Check physical continuity: flight[i].destination == flight[i+1].origin
+      // Check physical continuity: flight[i-1].destination == flight[i].origin
       if (i > 0) {
         const prev = flights[i - 1];
-        const curr = flights[i];
-        if (prev.destination !== curr.origin) {
+        if (prev && prev.destination !== curr.origin) {
           errors.push(
             `Tail ${tailId} airport discontinuity: ${prev.flight_id} arrives at ${prev.destination} but ${curr.flight_id} departs from ${curr.origin}`
           );

@@ -10,6 +10,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { FlightResult, ConnectionResult, CrewDutyResult } from '../../types/engine';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface FlightDrawerProps {
   flight: FlightResult | null;
@@ -32,6 +33,11 @@ export const FlightDrawer: React.FC<FlightDrawerProps> = ({
   onJumpToFlight,
   onJumpToAirport,
 }) => {
+  const containerRef = useFocusTrap<HTMLDivElement>({
+    isOpen: !!flight,
+    onClose,
+  });
+
   if (!flight) return null;
 
   // Filter connections associated with this flight (either as from_flight or to_flight)
@@ -67,8 +73,10 @@ export const FlightDrawer: React.FC<FlightDrawerProps> = ({
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-y-0 right-0 w-[380px] bg-white border-l border-border shadow-2xl z-50 flex flex-col overflow-y-auto animate-in slide-in-from-right duration-200"
       role="dialog"
+      aria-modal="true"
       aria-label={`Flight details for ${flight.flight_id}`}
     >
       {/* Header */}

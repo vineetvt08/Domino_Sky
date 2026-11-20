@@ -38,7 +38,7 @@ export const HelpTourModal: React.FC<HelpTourModalProps> = ({ isOpen, onClose })
 
   if (!isOpen) return null;
 
-  const step = TOUR_STEPS[currentStep];
+  const step = TOUR_STEPS[currentStep] ?? TOUR_STEPS[0]!;
   const Icon = step.icon;
 
   return (

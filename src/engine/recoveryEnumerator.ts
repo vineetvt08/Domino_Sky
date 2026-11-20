@@ -8,6 +8,15 @@ import {
 import { parseHHMM } from '../utils/time';
 import { runSimulation } from './simulator';
 
+/**
+ * Identifies all valid spare aircraft swap candidates according to airline operational rules:
+ * - The spare aircraft must be stationed at the candidate leg's origin airport.
+ * - The scheduled departure time must be >= spare aircraft availability time.
+ * - The spare takes over the target tail's remaining legs from that leg onward.
+ *
+ * @param data Complete NetworkData flight graph
+ * @returns Array of valid spare swaps with target tail and leg order
+ */
 export function getValidSpareSwaps(
   data: NetworkData
 ): Array<{
@@ -49,6 +58,18 @@ export function getValidSpareSwaps(
   return validSwaps;
 }
 
+/**
+ * Simulates and evaluates all valid single recovery actions (~100 candidates:
+ * cancellations and spare aircraft swaps), ranking them deterministically by:
+ * 1. Stranded passengers ascending (fewer is better)
+ * 2. Total delay minutes ascending (fewer is better)
+ * 3. Cancellations ascending (fewer is better)
+ *
+ * @param data Complete NetworkData flight graph
+ * @param closures Active airport closures
+ * @param currentResult Current baseline disrupted simulation result
+ * @returns Object with all evaluated actions and top 3 ranked recommendations
+ */
 export function enumerateRecoveryActions(
   data: NetworkData,
   closures: AirportClosure[],
